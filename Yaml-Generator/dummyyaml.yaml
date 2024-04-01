@@ -1,0 +1,167 @@
+variables:
+  apikey: 5f2b9577-9887-46dc-8293-2447c2b80009
+rest:
+  restConfigs:
+    aocCount:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select bid.aocdate,sum(acccnt) as accaoccnt,sum(rejcnt) as rejaoccnt
+        from (select wi.updateddate as aocdate,CASE WHEN bad.isbidaccepted is true
+        THEN 1 else 0 end as acccnt, CASE WHEN bad.isbidaccepted is false THEN 1 else
+        0 end as rejcnt FROM gep_tender_work_items wi JOIN gep_bids bds on bds.workitemid=wi.id
+        and validbid=true JOIN gep_bid_aoc aoc on aoc.workitemid=wi.id join gep_bid_aoc_details
+        bad on bad.bidaocid=aoc.id and bad.bidid=bds.id WHERE wi.ispublished is true
+        and tenderstatus='Expired' and wi.id=:tenderId)bid group by bid.aocdate;
+    aocDetails:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select ba.workitemid as id,ba.uploadeddate,completionperiod,contractdate,contractvalue,description,
+        usr.displayname as updatedby,ba.createddate as updatedon,aocfilename as docname,filesize
+        as docsize,filemimetype as doctype,'AOC' as docCode from gep_bid_aoc ba JOIN
+        gep_user usr ON usr.id = ba.uploadedby WHERE workitemid =:tenderId;
+    awardedBidsList:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select ba.id as id,ba.bidid as bidId ,cm.currencycode as currencyName,
+        round( CAST(ba.awardedvalue as numeric),2) as contractValue, bud.displayname
+        as tendererName FROM gep_tender_work_items twi join gep_bids bds on bds.workitemid=twi.id
+        join gep_bid_aoc aoc on aoc.workitemid=twi.id join gep_bid_aoc_details ba
+        on ba.bidaocid=aoc.id and ba.bidid=bds.id JOIN gep_bid_user_details bud ON
+        bud.id=ba.bidid and bud.id=bds.id JOIN gep_currency_master cm ON ba.currencyid=cm.id
+        where twi.ispublished is true and tenderstatus='Expired' and tender_stage='AOC'
+        and twi.id =:tenderId and ba.isbidaccepted is true;
+    finBidOpeningCount:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select bos.updateddate as finsummarydate,sum(acccnt) as accfinopcnt,sum(rejcnt)
+        as rejfinopcnt from (select wi.id as workitemid,CASE WHEN ba.isbidaccepted
+        is true THEN 1 else 0 end as acccnt, CASE WHEN ba.isbidaccepted is false THEN
+        1 else 0 end as rejcnt FROM gep_tender_work_items wi JOIN gep_bids bds on
+        bds.workitemid=wi.id and validbid=true JOIN gep_bid_audit ba on ba.bidid=bds.id
+        and bds.workitemid=ba.workitemid WHERE wi.ispublished is true and ba.status
+        ilike '%Finance' and wi.id=:tenderId)bid join gep_bid_open_summary bos on
+        bos.workitemid=bid.workitemid and bos.summarytype='Finance' group by bos.updateddate;
+    finBidOpeningDetails:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: SELECT bos.workitemid as id,bos.summaryType as summaryType,bos.summaryDoc
+        as docname,bos.filesize as docsize,bos.filemimetype as doctype,'BOS' as docCode,'BOQCHART'
+        as docCodeBOQ,bos.summary as summary,usr.displayname as updatedby, bos.updatedDate
+        as updatedDate,wi.boqchart FROM gep_bid_open_summary bos JOIN gep_tender_work_items
+        wi ON wi.id = bos.workitemid JOIN gep_user usr ON usr.id = bos.bidOpenerId
+        WHERE bos.workitemid =:tenderId AND bos.summaryType ='Finance' ORDER BY bos.id;
+    finEvaluationCount:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select te.uploadeddate as finevalsummarydate,sum(acccnt) as accfinevalcnt,sum(rejcnt)
+        as rejfinevalcnt from (select wi.id as workitemid,CASE WHEN eva.bidstatus=1
+        THEN 1 else 0 end as acccnt, CASE WHEN eva.bidstatus=2 THEN 1 else 0 end as
+        rejcnt FROM gep_tender_work_items wi JOIN gep_bids bds on bds.workitemid=wi.id
+        and validbid=true JOIN gep_eval_audit eva on eva.bidid=bds.id WHERE wi.ispublished
+        is true and eva.evaluationtype=2 and wi.id=:tenderId)bid join gep_tender_evaluation
+        te on te.workitemid=bid.workitemid and evaluationtype='Financial' group by
+        te.uploadeddate;
+    finEvaluationDetails:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select te.workitemid as id,te.chairpersonname,chairpersontype,committeeadd,uploadeddate,
+        usr.displayname as updatedby,evaluationtype,filename as docname,filesize as
+        docsize,filemimetype as doctype,'EVALSUM' as docCode from gep_tender_evaluation
+        te JOIN gep_user usr ON usr.id = te.uploadedby WHERE te.workitemid =:tenderId
+        AND evaluationtype='Financial' ORDER BY te.id;
+    techBidOpeningCount:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select bos.updateddate as techsummarydate,sum(acccnt) as acctechcnt,sum(rejcnt)
+        as rejtechcnt from (select wi.id as workitemid,CASE WHEN ba.isbidaccepted
+        is true THEN 1 else 0 end as acccnt, CASE WHEN ba.isbidaccepted is false THEN
+        1 else 0 end as rejcnt FROM gep_tender_work_items wi JOIN gep_bids bds on
+        bds.workitemid=wi.id and validbid=true JOIN gep_bid_audit ba on ba.bidid=bds.id
+        and bds.workitemid=ba.workitemid WHERE wi.ispublished is true and ba.status
+        ilike '%Technical' and wi.id=:tenderId)bid join gep_bid_open_summary bos on
+        bos.workitemid=bid.workitemid and bos.summarytype='Technical' group by bos.updateddate;
+    techBidOpeningDetails:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: SELECT bos.workitemid as id,bos.summaryType as summaryType,bos.summaryDoc
+        as docname,bos.filesize as docsize,bos.filemimetype as doctype,'BOS' as docCode,bos.summary
+        as summary,usr.displayname as updatedby, bos.updatedDate as updatedDate FROM
+        gep_bid_open_summary bos JOIN gep_user usr ON usr.id = bos.bidOpenerId WHERE
+        bos.workitemid =:tenderId AND bos.summaryType ='Technical' ORDER BY bos.id;
+    techEvaluationCount:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select te.uploadeddate as techevalsummarydate,sum(acccnt) as acctechevalcnt,sum(rejcnt)
+        as rejtechevalcnt from (select wi.id as workitemid,CASE WHEN eva.bidstatus=1
+        THEN 1 else 0 end as acccnt, CASE WHEN eva.bidstatus=2 THEN 1 else 0 end as
+        rejcnt FROM gep_tender_work_items wi JOIN gep_bids bds on bds.workitemid=wi.id
+        and validbid=true JOIN gep_eval_audit eva on eva.bidid=bds.id WHERE wi.ispublished
+        is true and eva.evaluationtype=1 and wi.id=:tenderId)bid join gep_tender_evaluation
+        te on te.workitemid=bid.workitemid and evaluationtype='Technical' group by
+        te.uploadeddate;
+    techEvaluationDetails:
+      apiKey: 5f2b9577-9887-46dc-8293-2447c2b80009
+      inputs:
+        tenderId: INTEGER
+      method: GET
+      query: select te.workitemid as id,te.chairpersonname,chairpersontype,committeeadd,uploadeddate,
+        usr.displayname as updatedby,evaluationtype,filename as docname,filesize as
+        docsize,filemimetype as doctype,'EVALSUM' as docCode from gep_tender_evaluation
+        te JOIN gep_user usr ON usr.id = te.uploadedby WHERE te.workitemid =:tenderId
+        AND evaluationtype='Technical' ORDER BY te.id;
+getTenderSearchResult:
+  apiKey: '*apikey'
+  inputs:
+    rowNo: INTEGER
+  method: GET
+  opinputs:
+    keyword: VARCHAR
+    tenderId: VARCHAR
+    tenderRefNo: VARCHAR
+    tenderStage: VARCHAR
+    tenderStatus: VARCHAR
+  query: SELECT * from fkdjhalkfjhdsa;
+getTenderSearchResult:
+  apiKey: '*apikey'
+  inputs:
+    rowNo: INTEGER
+  method: GET
+  opinputs:
+    keyword: VARCHAR
+    tenderId: VARCHAR
+    tenderRefNo: VARCHAR
+    tenderStage: VARCHAR
+    tenderStatus: VARCHAR
+  query: SELECT * from fkdjhalkfjhdsa;
+getTenderSearchResult:
+  apiKey: '*apikey'
+  inputs:
+    rowNo: INTEGER
+  method: GET
+  opinputs:
+    keyword: VARCHAR
+    tenderId: VARCHAR
+    tenderRefNo: VARCHAR
+    tenderStage: VARCHAR
+    tenderStatus: VARCHAR
+  query: SELECT * from fkdjhalkfjhdsa;
